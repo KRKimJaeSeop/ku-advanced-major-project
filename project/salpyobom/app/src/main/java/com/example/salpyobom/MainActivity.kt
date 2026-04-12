@@ -40,11 +40,14 @@ fun WebScreen(modifier: Modifier = Modifier) {
                 settings.domStorageEnabled = true
                 settings.setSupportZoom(false)
                 settings.builtInZoomControls = false
-
+                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                settings.allowFileAccessFromFileURLs = true  // 이거 추가
+                settings.allowUniversalAccessFromFileURLs = true  // 이거 추가
                 webViewClient = WebViewClient()
                 webChromeClient = android.webkit.WebChromeClient()
 
                 loadUrl("file:///android_asset/www/index.html")
+                //loadUrl("http://192.168.25.59:5500")
             }
         }
     )
