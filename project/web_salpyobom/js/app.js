@@ -112,6 +112,17 @@ function logout() {
     location.reload();
 }
 
+function initSidebarToggle() {
+    const sidebar = el('main-sidebar');
+    const overlay = el('sidebar-overlay');
+
+    const open  = () => { sidebar.classList.add('sidebar-open');    overlay.classList.add('active'); };
+    const close = () => { sidebar.classList.remove('sidebar-open'); overlay.classList.remove('active'); };
+
+    on('btn-menu', 'click', open);
+    overlay?.addEventListener('click', close);
+}
+
 // ══════════════════════════════════════════════════
 // 대시보드
 // ══════════════════════════════════════════════════
@@ -121,7 +132,9 @@ async function showDashboard() {
     el('dashboard-wrap') .style.display = 'flex';
 
     initClock();
-    on('btn-logout', 'click', logout);
+    initSidebarToggle();
+    on('btn-logout',        'click', logout);
+    on('btn-back-to-list',  'click', () => el('situations-panel')?.scrollIntoView({ behavior: 'smooth' }));
 
     try {
         const user = await API.me();
@@ -171,6 +184,10 @@ function renderSituationsTable(situations) {
             tbody.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
             row.classList.add('active-row');
             loadPatientDetail(row.dataset.patientId, +row.dataset.situationId);
+            // 모바일: 상세 패널로 스크롤
+            if (window.innerWidth < 1024) {
+                el('detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         });
     });
 
@@ -185,14 +202,14 @@ function situationRow(s, isFirst) {
 
     return `
     <tr class="${rowCls}" data-situation-id="${s.situation_id}" data-patient-id="${s.patient_id}">
-        <td class="px-6 py-4">
-            <div class="font-bold text-slate-800">${s.name}</div>
+        <td class="px-3 lg:px-6 py-3 lg:py-4">
+            <div class="font-bold text-slate-800 text-sm">${s.name}</div>
             <div class="text-[10px] text-slate-500">${s.address_summary}</div>
         </td>
-        <td class="px-6 py-4"><span class="px-2 py-0.5 ${badgeCls} text-[10px] font-black rounded border">${s.category}</span></td>
-        <td class="px-6 py-4 text-sm text-slate-600">${s.detail_reason || '-'}</td>
-        <td class="px-6 py-4 text-xs font-mono text-slate-400">${formatTime(s.occurred_at)}</td>
-        <td class="px-6 py-4 text-center">${getStatusCell(s.action_status)}</td>
+        <td class="px-3 lg:px-6 py-3 lg:py-4"><span class="px-2 py-0.5 ${badgeCls} text-[10px] font-black rounded border">${s.category}</span></td>
+        <td class="hidden md:table-cell px-3 lg:px-6 py-3 lg:py-4 text-sm text-slate-600">${s.detail_reason || '-'}</td>
+        <td class="hidden sm:table-cell px-3 lg:px-6 py-3 lg:py-4 text-xs font-mono text-slate-400">${formatTime(s.occurred_at)}</td>
+        <td class="px-3 lg:px-6 py-3 lg:py-4 text-center">${getStatusCell(s.action_status)}</td>
     </tr>`;
 }
 

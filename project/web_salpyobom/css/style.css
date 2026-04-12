@@ -1,4 +1,4 @@
-/*살펴봄 행정망 스타일 시트 */
+/* 살펴봄 행정망 스타일 시트 */
 :root {
     --primary-navy: #1e293b;
     --sky-blue: #0284c7;
@@ -13,7 +13,6 @@ body {
     font-family: 'Noto Sans KR', sans-serif;
     background-color: var(--bg-slate);
     color: var(--text-main);
-    overflow: hidden;
 }
 
 .admin-sidebar {
@@ -30,27 +29,47 @@ body {
     border-left: 4px solid var(--sky-blue);
 }
 
-/* Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-}
+/* ── 커스텀 스크롤바 ─────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: #f1f5f9;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 10px;
-}
-
-/* Animations */
-.pulse-red {
-    animation: pulse 2s infinite;
-}
+/* ── 애니메이션 ──────────────────────────────── */
+.pulse-red { animation: pulse 2s infinite; }
 
 @keyframes pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.1); opacity: 0.7; }
-    100% { transform: scale(1); opacity: 1; }
+    0%   { transform: scale(1);   opacity: 1;   }
+    50%  { transform: scale(1.1); opacity: 0.7; }
+    100% { transform: scale(1);   opacity: 1;   }
+}
+
+/* ══════════════════════════════════════════════
+   모바일 사이드바 드로어 (< 1024px)
+══════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+    #main-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        z-index: 40;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    #main-sidebar.sidebar-open {
+        transform: translateX(0);
+    }
+}
+
+/* 사이드바 오버레이 (모바일) */
+#sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 30;
+    transition: opacity 0.3s ease;
+}
+#sidebar-overlay.active {
+    display: block;
 }
