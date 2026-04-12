@@ -1,16 +1,16 @@
 package com.example.salpyobom
 
 import android.os.Bundle
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.salpyobom.ui.theme.SalpyobomTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +19,33 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SalpyobomTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                // Scaffold 제거, WebScreen 바로 호출
+                WebScreen(modifier = Modifier.fillMaxSize())
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+fun WebScreen(modifier: Modifier = Modifier) {
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { context ->
+            WebView(context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.setSupportZoom(false)
+                settings.builtInZoomControls = false
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SalpyobomTheme {
-        Greeting("Android")
-    }
+                webViewClient = WebViewClient()
+                webChromeClient = android.webkit.WebChromeClient()
+
+                loadUrl("file:///android_asset/www/index.html")
+            }
+        }
+    )
 }
