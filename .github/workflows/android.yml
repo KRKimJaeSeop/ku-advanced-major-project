@@ -1,0 +1,57 @@
+name: Android CI
+
+on:
+  push:
+    tags:
+      - 'v*'     # v1.0.0 같은 태그 푸시만 작동
+
+  workflow_dispatch:  # 수동 실행도 허용
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write 
+
+    defaults:
+      run:
+        working-directory: project/salpyobom
+    steps:
+    - uses: actions/checkout@v4
+    - name: set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Clean Bulid
+      run: ./gradlew clean
+       
+    - name: Assemble
+      run: ./gradlew assemble
+      
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+       name: debug
+       path: project/salpyobom/app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+       name: release
+       path: project/salpyobom/app/build/outputs/apk/release/app-release-unsigned.apk
+
+    - name: Upload to GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          project/salpyobom/app/build/outputs/apk/debug/app-debug.apk
+          project/salpyobom/app/build/outputs/apk/release/app-release-unsigned.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
