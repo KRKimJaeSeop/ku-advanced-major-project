@@ -33,9 +33,10 @@ const API = {
     me:       ()                          => apiRequest('GET',  '/auth/me'),
 
     // 대시보드
-    getDashboardSummary:  ()          => apiRequest('GET', '/dashboard/summary'),
-    getActiveSituations:  (limit=50)  => apiRequest('GET', `/situations/active?limit=${limit}`),
-    getPatientDetails:    (patientId) => apiRequest('GET', `/patients/${patientId}/details`),
+    getDashboardSummary:  ()              => apiRequest('GET', '/dashboard/summary'),
+    getActiveSituations:  (limit=50)      => apiRequest('GET', `/situations/active?limit=${limit}`),
+    listPatients:         (limit=100)     => apiRequest('GET', `/patients?limit=${limit}`),
+    getPatientDetails:    (patientId)     => apiRequest('GET', `/patients/${patientId}/details`),
 
     // 조치 등록
     createAction: (situationId, actionType, actionNote, statusUpdate) =>
