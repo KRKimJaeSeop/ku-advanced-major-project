@@ -29,6 +29,12 @@ const ALERT_THEMES = {
     },
 };
 
+const PAGE_TITLES = {
+    dashboard: '실시간 취약계층 안전 확인 관제',
+    patients:  '대상자 DB 관리',
+    report:    '보고서 조회',
+};
+
 // ── 상태 ────────────────────────────────────────
 let currentSituationId = null;
 
@@ -124,6 +130,47 @@ function initSidebarToggle() {
 }
 
 // ══════════════════════════════════════════════════
+// 페이지 네비게이션
+// ══════════════════════════════════════════════════
+
+function navigateTo(page) {
+    // 페이지 전환
+    ['dashboard', 'patients', 'report'].forEach(p => {
+        el(`page-${p}`)?.classList.toggle('hidden', p !== page);
+    });
+
+    // 헤더 타이틀 변경
+    setText('page-title', PAGE_TITLES[page] || '');
+
+    // 사이드바 활성 링크 갱신
+    document.querySelectorAll('.nav-link').forEach(a => {
+        const isActive = a.dataset.page === page;
+        a.classList.toggle('text-white',      isActive);
+        a.classList.toggle('bg-white/5',      isActive);
+        a.classList.toggle('border-r-4',      isActive);
+        a.classList.toggle('border-sky-500',  isActive);
+        a.classList.toggle('font-medium',     isActive);
+        a.classList.toggle('text-slate-400',  !isActive);
+        // 아이콘 색상
+        const icon = a.querySelector('i');
+        if (icon) icon.classList.toggle('text-sky-400', isActive);
+    });
+
+    // 페이지별 데이터 로드
+    if (page === 'patients') loadPatientsPage();
+    if (page === 'report')   loadReportPage();
+}
+
+function initNavLinks() {
+    document.querySelectorAll('.nav-link').forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            navigateTo(a.dataset.page);
+        });
+    });
+}
+
+// ══════════════════════════════════════════════════
 // 대시보드
 // ══════════════════════════════════════════════════
 
@@ -133,8 +180,10 @@ async function showDashboard() {
 
     initClock();
     initSidebarToggle();
-    on('btn-logout',        'click', logout);
-    on('btn-back-to-list',  'click', () => el('situations-panel')?.scrollIntoView({ behavior: 'smooth' }));
+    initNavLinks();
+
+    on('btn-logout',       'click', logout);
+    on('btn-back-to-list', 'click', () => el('situations-panel')?.scrollIntoView({ behavior: 'smooth' }));
 
     try {
         const user = await API.me();
@@ -142,8 +191,10 @@ async function showDashboard() {
         setText('sidebar-email',    user.email);
     } catch (_) {}
 
+    navigateTo('dashboard');
     loadDashboardSummary();
     loadActiveSituations();
+    loadAllPatients();
 }
 
 async function loadDashboardSummary() {
@@ -161,17 +212,35 @@ async function loadActiveSituations() {
         const { data } = await API.getActiveSituations();
         renderSituationsTable(data.situations);
     } catch (_) {
-        el('situations-tbody').innerHTML =
+        el('active-situations-tbody').innerHTML =
             '<tr><td colspan="5" class="px-6 py-8 text-center text-red-400 text-sm">데이터를 불러오지 못했습니다.</td></tr>';
     }
 }
 
+async function loadAllPatients() {
+    try {
+        const { data } = await API.listPatients();
+        const sorted = [...data.patients].sort((a, b) => levelOrder(a.cross_verification_level) - levelOrder(b.cross_verification_level));
+        renderPatientsTable(sorted);
+    } catch (_) {
+        el('patients-tbody').innerHTML =
+            '<tr><td colspan="3" class="px-6 py-8 text-center text-red-400 text-sm">데이터를 불러오지 못했습니다.</td></tr>';
+    }
+}
+
+function levelOrder(level) {
+    if (!level) return 3;
+    if (level.includes('A') || level.includes('긴급')) return 0;
+    if (level.includes('B') || level.includes('높음')) return 1;
+    return 2;
+}
+
 // ══════════════════════════════════════════════════
-// 상황 테이블 렌더링
+// 상황 테이블 렌더링 (대시보드)
 // ══════════════════════════════════════════════════
 
 function renderSituationsTable(situations) {
-    const tbody = el('situations-tbody');
+    const tbody = el('active-situations-tbody');
     if (!situations?.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400 text-sm">현재 활성 상황이 없습니다.</td></tr>';
         return;
@@ -184,14 +253,11 @@ function renderSituationsTable(situations) {
             tbody.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
             row.classList.add('active-row');
             loadPatientDetail(row.dataset.patientId, +row.dataset.situationId);
-            // 모바일: 상세 패널로 스크롤
             if (window.innerWidth < 1024) {
                 el('detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
     });
-
-    loadPatientDetail(situations[0].patient_id, situations[0].situation_id);
 }
 
 function situationRow(s, isFirst) {
@@ -229,8 +295,62 @@ function getStatusCell(status) {
 function formatTime(iso) {
     if (!iso) return '--:--:--';
     const d = new Date(iso);
+    if (isNaN(d)) return iso;
     const p = n => String(n).padStart(2, '0');
     return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// ══════════════════════════════════════════════════
+// 전체 환자 테이블 렌더링 (대시보드)
+// ══════════════════════════════════════════════════
+
+function renderPatientsTable(patients) {
+    const tbody = el('patients-tbody');
+    if (!patients?.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400 text-sm">대상자가 없습니다.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = patients.map((p, idx) => patientRow(p, idx === 0)).join('');
+
+    tbody.querySelectorAll('tr[data-patient-id]').forEach(row => {
+        row.addEventListener('click', () => {
+            tbody.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
+            row.classList.add('active-row');
+            loadPatientDetail(row.dataset.patientId, null);
+            if (window.innerWidth < 1024) {
+                el('detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+    loadPatientDetail(patients[0].patient_id, null);
+}
+
+function patientRow(p, isFirst) {
+    const lvlCls = getLevelBadge(p.cross_verification_level);
+    const rowCls = isFirst
+        ? 'active-row cursor-pointer transition-colors'
+        : 'hover:bg-slate-50 cursor-pointer transition-colors';
+
+    return `
+    <tr class="${rowCls}" data-patient-id="${p.patient_id}">
+        <td class="px-3 lg:px-6 py-3 lg:py-4">
+            <div class="font-bold text-slate-800 text-sm">${p.name}</div>
+            <div class="text-[10px] text-slate-500">${p.address_summary}</div>
+        </td>
+        <td class="px-3 lg:px-6 py-3 lg:py-4">
+            <span class="px-2 py-0.5 ${lvlCls} text-[10px] font-black rounded border">${p.cross_verification_level || '-'}</span>
+        </td>
+        <td class="px-3 lg:px-6 py-3 lg:py-4 text-xs text-slate-500">${p.manager_name || '-'}</td>
+    </tr>`;
+}
+
+function getLevelBadge(level) {
+    if (!level) return 'bg-slate-100 text-slate-600 border-slate-200';
+    if (level.includes('A') || level.includes('긴급')) return 'bg-red-100 text-red-600 border-red-200';
+    if (level.includes('B') || level.includes('높음')) return 'bg-orange-100 text-orange-600 border-orange-200';
+    return 'bg-blue-100 text-blue-600 border-blue-200';
 }
 
 // ══════════════════════════════════════════════════
@@ -286,21 +406,163 @@ function renderDiseaseTags(diseases) {
 // 조치 버튼
 // ══════════════════════════════════════════════════
 
-on('btn-action-call', 'click', () => submitAction('유선 연락', null,               '조치 완료'), true);
-on('btn-action-log',  'click', () => {
-    const note = prompt('업무 일지 내용을 입력하세요:');
-    if (note !== null) submitAction('기타', note, '조치 완료');
-}, true);
+on('btn-action-call', 'click', () => submitAction('유선 연락', null, '조치 완료'), true);
 
 async function submitAction(actionType, note, statusUpdate) {
     if (!currentSituationId) return;
     try {
         await API.createAction(currentSituationId, actionType, note, statusUpdate);
-        alert('업무 일지가 등록되었습니다.');
+        alert('조치가 등록되었습니다.');
         loadActiveSituations();
         loadDashboardSummary();
     } catch (_) {
         alert('등록에 실패했습니다. 다시 시도해주세요.');
+    }
+}
+
+// ══════════════════════════════════════════════════
+// 대상자 DB 페이지
+// ══════════════════════════════════════════════════
+
+async function loadPatientsPage() {
+    const tbody = el('db-patients-tbody');
+    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400 text-sm">데이터를 불러오는 중...</td></tr>';
+
+    try {
+        const { data } = await API.listPatients();
+        const sorted = [...data.patients].sort((a, b) => levelOrder(a.cross_verification_level) - levelOrder(b.cross_verification_level));
+
+        setText('db-patient-count', `총 ${sorted.length}명`);
+
+        if (!sorted.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400 text-sm">등록된 대상자가 없습니다.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = sorted.map((p, i) => `
+        <tr class="hover:bg-slate-50 transition-colors">
+            <td class="px-6 py-3 text-xs text-slate-400 font-mono">${String(i + 1).padStart(3, '0')}</td>
+            <td class="px-6 py-3 font-bold text-slate-800 text-sm">${p.name}</td>
+            <td class="px-6 py-3 text-xs text-slate-500">${p.address_summary}</td>
+            <td class="px-6 py-3">
+                <span class="px-2 py-0.5 ${getLevelBadge(p.cross_verification_level)} text-[10px] font-black rounded border">
+                    ${p.cross_verification_level || '-'}
+                </span>
+            </td>
+            <td class="px-6 py-3 text-xs text-slate-500">${p.manager_name || '-'}</td>
+        </tr>`).join('');
+    } catch (_) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-red-400 text-sm">데이터를 불러오지 못했습니다.</td></tr>';
+    }
+}
+
+// ══════════════════════════════════════════════════
+// 보고서 조회 페이지
+// ══════════════════════════════════════════════════
+
+async function loadReportPage() {
+    el('report-output') .classList.add('hidden');
+    el('report-loading').classList.remove('hidden');
+
+    // 보고서 생성 시각 = 오늘 자정 (매일 00:00 생성 정책 반영)
+    const now       = new Date();
+    const pad       = n => String(n).padStart(2, '0');
+    const midnight  = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const today     = `${now.getFullYear()}년 ${pad(now.getMonth() + 1)}월 ${pad(now.getDate())}일`;
+    const genAt     = `${midnight.getFullYear()}-${pad(midnight.getMonth()+1)}-${pad(midnight.getDate())} 00:00`;
+
+    setText('report-title',        `${today} 일일 현황 보고서`);
+    setText('report-generated-at', genAt);
+
+    try {
+        const [summaryRes, situationsRes, patientsRes] = await Promise.all([
+            API.getDashboardSummary(),
+            API.getActiveSituations(100),
+            API.listPatients(100),
+        ]);
+
+        const summary    = summaryRes.data;
+        const situations = situationsRes.data.situations;
+        const patients   = [...patientsRes.data.patients].sort((a, b) => levelOrder(a.cross_verification_level) - levelOrder(b.cross_verification_level));
+
+        // 요약 통계
+        el('report-stats').innerHTML = `
+            <div class="bg-red-50 border border-red-100 rounded p-4 text-center">
+                <p class="text-[10px] font-bold text-red-400 mb-1">응급 및 낙상</p>
+                <p class="text-3xl font-black text-red-600">${summary.emergency_count}</p>
+            </div>
+            <div class="bg-orange-50 border border-orange-100 rounded p-4 text-center">
+                <p class="text-[10px] font-bold text-orange-400 mb-1">미응답 / 지연</p>
+                <p class="text-3xl font-black text-orange-600">${summary.warning_count}</p>
+            </div>
+            <div class="bg-sky-50 border border-sky-100 rounded p-4 text-center">
+                <p class="text-[10px] font-bold text-sky-400 mb-1">정상 모니터링</p>
+                <p class="text-3xl font-black text-sky-600">${summary.normal_count}</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded p-4 text-center">
+                <p class="text-[10px] font-bold text-slate-400 mb-1">전체 대상자</p>
+                <p class="text-3xl font-black text-slate-700">${summary.total_monitoring_count}</p>
+            </div>`;
+
+        // 상황 발생 내역
+        const situationRows = situations.length
+            ? situations.map(s => `
+                <tr class="border-t border-slate-100">
+                    <td class="px-4 py-2.5 font-bold text-slate-800 text-sm">${s.name}</td>
+                    <td class="px-4 py-2.5"><span class="px-2 py-0.5 ${getCategoryBadge(s.category)} text-[10px] font-black rounded border">${s.category}</span></td>
+                    <td class="px-4 py-2.5 text-xs text-slate-600">${s.detail_reason || '-'}</td>
+                    <td class="px-4 py-2.5 text-xs font-mono text-slate-400">${formatTime(s.occurred_at)}</td>
+                    <td class="px-4 py-2.5">${getStatusCell(s.action_status)}</td>
+                </tr>`).join('')
+            : '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400 text-sm">금일 상황 발생 없음</td></tr>';
+
+        el('report-situations-wrap').innerHTML = `
+            <table class="w-full text-left">
+                <thead class="bg-slate-50">
+                    <tr class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                        <th class="px-4 py-2.5">대상자</th>
+                        <th class="px-4 py-2.5">구분</th>
+                        <th class="px-4 py-2.5">상세 사유</th>
+                        <th class="px-4 py-2.5">발생 시각</th>
+                        <th class="px-4 py-2.5">상태</th>
+                    </tr>
+                </thead>
+                <tbody>${situationRows}</tbody>
+            </table>`;
+
+        // 전체 대상자 현황
+        const patientRows = patients.map((p, i) => `
+            <tr class="border-t border-slate-100">
+                <td class="px-4 py-2.5 text-xs text-slate-400 font-mono">${String(i + 1).padStart(3, '0')}</td>
+                <td class="px-4 py-2.5 font-bold text-slate-800 text-sm">${p.name}</td>
+                <td class="px-4 py-2.5 text-xs text-slate-500">${p.address_summary}</td>
+                <td class="px-4 py-2.5">
+                    <span class="px-2 py-0.5 ${getLevelBadge(p.cross_verification_level)} text-[10px] font-black rounded border">
+                        ${p.cross_verification_level || '-'}
+                    </span>
+                </td>
+                <td class="px-4 py-2.5 text-xs text-slate-500">${p.manager_name || '-'}</td>
+            </tr>`).join('');
+
+        el('report-patients-wrap').innerHTML = `
+            <table class="w-full text-left">
+                <thead class="bg-slate-50">
+                    <tr class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                        <th class="px-4 py-2.5">#</th>
+                        <th class="px-4 py-2.5">이름</th>
+                        <th class="px-4 py-2.5">주소</th>
+                        <th class="px-4 py-2.5">AI 분석 등급</th>
+                        <th class="px-4 py-2.5">담당자</th>
+                    </tr>
+                </thead>
+                <tbody>${patientRows}</tbody>
+            </table>`;
+
+        el('report-loading').classList.add('hidden');
+        el('report-output') .classList.remove('hidden');
+
+    } catch (_) {
+        el('report-loading').innerHTML = '<p class="text-red-400 text-sm">보고서를 불러오지 못했습니다.</p>';
     }
 }
 
@@ -331,7 +593,6 @@ function showMsg(el, msg)     { el.textContent = msg; el.classList.remove('hidde
 function setBtn(btn, disabled, text) { btn.disabled = disabled; btn.textContent = text; }
 function on(id, event, handler, defer = false) {
     if (defer) {
-        // 버튼이 아직 DOM에 없을 수 있으므로 이벤트 위임 사용
         document.addEventListener(event, e => { if (e.target.closest(`#${id}`)) handler(e); });
     } else {
         const e = el(id);
