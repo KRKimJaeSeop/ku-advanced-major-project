@@ -8,7 +8,7 @@ const CATEGORY_BADGE = {
     '응급': 'bg-red-100 text-red-600 border-red-200',
     '미응답': 'bg-orange-100 text-orange-600 border-orange-200',
     '지연': 'bg-orange-100 text-orange-600 border-orange-200',
-    '투약': 'bg-blue-100 text-blue-600 border-blue-200',
+    '투약': 'bg-green-100 text-green-700 border-green-200',
 };
 
 const ALERT_THEMES = {
@@ -23,9 +23,9 @@ const ALERT_THEMES = {
         title: 'text-xs font-black text-red-700',
     },
     normal: {
-        box:   'p-4 bg-blue-50 border border-blue-100 rounded-lg',
-        icon:  'fa-solid fa-circle-info text-blue-600 text-sm',
-        title: 'text-xs font-black text-blue-700',
+        box:   'p-4 bg-green-50 border border-green-100 rounded-lg',
+        icon:  'fa-solid fa-circle-info text-green-600 text-sm',
+        title: 'text-xs font-black text-green-700',
     },
 };
 
@@ -37,6 +37,7 @@ const PAGE_TITLES = {
 
 // ── 상태 ────────────────────────────────────────
 let currentSituationId = null;
+let pollingInterval    = null;
 
 // ── 초기화 ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => initAuth());
@@ -114,8 +115,16 @@ async function handleSignup() {
 }
 
 function logout() {
+    clearInterval(pollingInterval);
     sessionStorage.removeItem('salpyobom_token');
     location.reload();
+}
+
+function startPolling() {
+    pollingInterval = setInterval(() => {
+        loadActiveSituations();
+        loadDashboardSummary();
+    }, 30000);
 }
 
 function initSidebarToggle() {
@@ -145,15 +154,15 @@ function navigateTo(page) {
     // 사이드바 활성 링크 갱신
     document.querySelectorAll('.nav-link').forEach(a => {
         const isActive = a.dataset.page === page;
-        a.classList.toggle('text-white',      isActive);
-        a.classList.toggle('bg-white/5',      isActive);
-        a.classList.toggle('border-r-4',      isActive);
-        a.classList.toggle('border-sky-500',  isActive);
-        a.classList.toggle('font-medium',     isActive);
-        a.classList.toggle('text-slate-400',  !isActive);
+        a.classList.toggle('text-white',       isActive);
+        a.classList.toggle('bg-white/10',      isActive);
+        a.classList.toggle('border-r-4',       isActive);
+        a.classList.toggle('border-green-400', isActive);
+        a.classList.toggle('font-medium',      isActive);
+        a.classList.toggle('text-green-200',   !isActive);
         // 아이콘 색상
         const icon = a.querySelector('i');
-        if (icon) icon.classList.toggle('text-sky-400', isActive);
+        if (icon) icon.classList.toggle('text-green-300', isActive);
     });
 
     // 페이지별 데이터 로드
@@ -195,6 +204,7 @@ async function showDashboard() {
     loadDashboardSummary();
     loadActiveSituations();
     loadAllPatients();
+    startPolling();
 }
 
 async function loadDashboardSummary() {
@@ -288,7 +298,7 @@ function getStatusCell(status) {
     if (status === '조치 대기')
         return `<div class="flex items-center justify-center gap-1.5"><span class="w-1.5 h-1.5 bg-red-500 rounded-full pulse-red"></span><span class="text-[11px] font-bold text-red-600">조치 대기</span></div>`;
     if (status === '현장 출동')
-        return `<div class="flex items-center justify-center gap-1.5"><span class="w-1.5 h-1.5 bg-sky-500 rounded-full"></span><span class="text-[11px] font-bold text-sky-600">현장 출동</span></div>`;
+        return `<div class="flex items-center justify-center gap-1.5"><span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span><span class="text-[11px] font-bold text-green-600">현장 출동</span></div>`;
     return `<span class="text-[11px] font-bold text-slate-400">조치 완료</span>`;
 }
 
@@ -350,7 +360,7 @@ function getLevelBadge(level) {
     if (!level) return 'bg-slate-100 text-slate-600 border-slate-200';
     if (level.includes('A') || level.includes('긴급')) return 'bg-red-100 text-red-600 border-red-200';
     if (level.includes('B') || level.includes('높음')) return 'bg-orange-100 text-orange-600 border-orange-200';
-    return 'bg-blue-100 text-blue-600 border-blue-200';
+    return 'bg-green-100 text-green-700 border-green-200';
 }
 
 // ══════════════════════════════════════════════════
@@ -359,10 +369,18 @@ function getLevelBadge(level) {
 
 async function loadPatientDetail(patientId, situationId) {
     currentSituationId = situationId;
+    syncActionButton();
     try {
         const { data } = await API.getPatientDetails(patientId);
         renderDetailPanel(data);
     } catch (_) {}
+}
+
+function syncActionButton() {
+    const btn = el('btn-action-call');
+    if (!btn) return;
+    btn.disabled = !currentSituationId;
+    btn.title = currentSituationId ? '유선 연락 조치 등록' : '상황을 선택하면 활성화됩니다';
 }
 
 function renderDetailPanel(d) {
@@ -379,7 +397,20 @@ function renderDetailPanel(d) {
     setText('detail-visit-time',  adm.next_visit_time);
     setText('detail-visit-plan',  adm.next_visit_plan);
 
-    el('detail-image').src = d.profile_image_url || '';
+    const imgEl         = el('detail-image');
+    const placeholderEl = el('detail-image-placeholder');
+    const showImg = (show) => {
+        imgEl.style.display         = show ? 'block' : 'none';
+        placeholderEl.style.display = show ? 'none'  : 'block';
+    };
+    imgEl.onerror = function() { showImg(false); this.onerror = null; };
+    if (d.profile_image_url) {
+        imgEl.src = d.profile_image_url;
+        showImg(true);
+    } else {
+        imgEl.src = '';
+        showImg(false);
+    }
 
     const lvl  = ai.cross_verification_level || '';
     const type = lvl.includes('A') || lvl.includes('긴급') ? 'emergency'
@@ -412,11 +443,11 @@ async function submitAction(actionType, note, statusUpdate) {
     if (!currentSituationId) return;
     try {
         await API.createAction(currentSituationId, actionType, note, statusUpdate);
-        alert('조치가 등록되었습니다.');
+        showToast('조치가 등록되었습니다.');
         loadActiveSituations();
         loadDashboardSummary();
     } catch (_) {
-        alert('등록에 실패했습니다. 다시 시도해주세요.');
+        showToast('등록에 실패했습니다. 다시 시도해주세요.', 'error');
     }
 }
 
@@ -495,9 +526,9 @@ async function loadReportPage() {
                 <p class="text-[10px] font-bold text-orange-400 mb-1">미응답 / 지연</p>
                 <p class="text-3xl font-black text-orange-600">${summary.warning_count}</p>
             </div>
-            <div class="bg-sky-50 border border-sky-100 rounded p-4 text-center">
-                <p class="text-[10px] font-bold text-sky-400 mb-1">정상 모니터링</p>
-                <p class="text-3xl font-black text-sky-600">${summary.normal_count}</p>
+            <div class="bg-green-50 border border-green-100 rounded p-4 text-center">
+                <p class="text-[10px] font-bold text-green-500 mb-1">정상 모니터링</p>
+                <p class="text-3xl font-black text-green-600">${summary.normal_count}</p>
             </div>
             <div class="bg-slate-50 border border-slate-200 rounded p-4 text-center">
                 <p class="text-[10px] font-bold text-slate-400 mb-1">전체 대상자</p>
@@ -598,4 +629,26 @@ function on(id, event, handler, defer = false) {
         const e = el(id);
         if (e) e.addEventListener(event, handler);
     }
+}
+
+function showToast(msg, type = 'success') {
+    const container = el('toast-container');
+    const palettes = {
+        success: { bg: 'bg-green-600',  icon: 'fa-circle-check' },
+        error:   { bg: 'bg-red-600',    icon: 'fa-circle-xmark' },
+        info:    { bg: 'bg-gray-700',   icon: 'fa-circle-info'  },
+    };
+    const { bg, icon } = palettes[type] ?? palettes.info;
+
+    const div = document.createElement('div');
+    div.className = `flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm font-bold ${bg} translate-x-full transition-transform duration-300 ease-out`;
+    div.innerHTML = `<i class="fa-solid ${icon}"></i><span>${msg}</span>`;
+
+    container.appendChild(div);
+    requestAnimationFrame(() => requestAnimationFrame(() => div.classList.replace('translate-x-full', 'translate-x-0')));
+
+    setTimeout(() => {
+        div.classList.replace('translate-x-0', 'translate-x-full');
+        div.addEventListener('transitionend', () => div.remove(), { once: true });
+    }, 3000);
 }
