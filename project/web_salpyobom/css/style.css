@@ -1,38 +1,45 @@
 /* 살펴봄 행정망 스타일 시트 */
 :root {
-    --primary-navy: #1e293b;
-    --sky-blue: #0284c7;
-    --bg-slate: #f8fafc;
-    --border-color: #e2e8f0;
-    --text-main: #334155;
+    --primary-green: #14532d;
+    --accent-green: #16a34a;
+    --bg-light: #f0fdf4;
+    --border-color: #d1fae5;
+    --text-main: #1f2937;
     --emergency-red: #ef4444;
     --warning-orange: #f97316;
 }
 
 body {
     font-family: 'Noto Sans KR', sans-serif;
-    background-color: var(--bg-slate);
+    background-color: var(--bg-light);
     color: var(--text-main);
 }
 
 .admin-sidebar {
-    background-color: var(--primary-navy);
+    background-color: var(--primary-green);
 }
 
 .content-panel {
     background-color: #ffffff;
-    border: 1px solid var(--border-color);
+    border: 1px solid #e5e7eb;
 }
 
 .active-row {
-    background-color: #f1f5f9;
-    border-left: 4px solid var(--sky-blue);
+    background-color: #f0fdf4;
+    border-left: 4px solid var(--accent-green);
 }
 
 /* ── 커스텀 스크롤바 ─────────────────────────── */
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f0fdf4; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #86efac; border-radius: 10px; }
+
+/* ── 조치 버튼 비활성 상태 ────────────────────── */
+#btn-action-call:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
 
 /* ── 애니메이션 ──────────────────────────────── */
 .pulse-red { animation: pulse 2s infinite; }
