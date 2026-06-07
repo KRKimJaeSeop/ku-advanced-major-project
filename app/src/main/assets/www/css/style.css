@@ -1,0 +1,56 @@
+/*살펴봄 행정망 스타일 시트 */
+:root {
+    --primary-navy: #1e293b;
+    --sky-blue: #0284c7;
+    --bg-slate: #f8fafc;
+    --border-color: #e2e8f0;
+    --text-main: #334155;
+    --emergency-red: #ef4444;
+    --warning-orange: #f97316;
+}
+
+body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background-color: var(--bg-slate);
+    color: var(--text-main);
+    overflow: hidden;
+}
+
+.admin-sidebar {
+    background-color: var(--primary-navy);
+}
+
+.content-panel {
+    background-color: #ffffff;
+    border: 1px solid var(--border-color);
+}
+
+.active-row {
+    background-color: #f1f5f9;
+    border-left: 4px solid var(--sky-blue);
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+/* Animations */
+.pulse-red {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
